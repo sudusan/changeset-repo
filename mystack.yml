@@ -1,0 +1,233 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AutoResults Application's Production Environment's CF Template
+Parameters:
+  Application:
+    Type: String
+    Default: myapp
+    Description: Please enter your Application Name
+  Environment:
+    Type: String
+    Default: prd
+    AllowedValues:
+      - prd
+    Description: Please enter your environment name
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: VpcId of your existing Virtual Private Cloud (VPC)
+  EC2SubnetA:
+    Type: 'AWS::EC2::Subnet::Id'
+    Description: Enter App Subnet Group Id at AZ-a
+  EC2SubnetB:
+    Type: 'AWS::EC2::Subnet::Id'
+    Description: Enter App Subnet Group Id at AZ-b
+
+  EC2InstanceType:
+    Description: EC2 Application Server Instance Type
+    Type: String
+    Default: m5a.xlarge
+
+  EC2HostName:
+    Type: String
+    Default: myapphost
+    AllowedValues:
+      - myapphost
+    Description: Please specify the AutoResults EC2 host name in lowercase only
+  EC2NodeCount:
+    Type: String
+    Default: '1'
+    Description: Please specify the number of nodes for autoscaling
+  AMI:
+    Description: AMI ID of the image
+    Type: 'AWS::EC2::Image::Id'
+    Default: ami-0a6b96ce710e139e3
+  KeyName:
+    Description: The EC2 Key Pair to allow RDP access to the instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  InternalCorporateCidrIp:
+    Description: >-
+      Corporate internal CIDR (Used to limit ingress traffic only from the
+      corporate IP space)
+    Type: String
+    Default: 0.0.0.0/0
+Resources:
+  EC2LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            c:\cfn\cfn-hup.conf:
+              content:
+                Fn::Join:
+                - ''
+                - - "[main]\n"
+                  - stack=
+                  - Ref: AWS::StackId
+                  - "\n"
+                  - region=
+                  - Ref: AWS::Region
+                  - "\n"
+            c:\initialize-disk.ps1:
+              content:
+                Fn::Join:
+                - ' | '
+                - - "Get-Disk"
+                  - "Where partitionstyle -eq 'raw'"
+                  - 'Initialize-Disk -PartitionStyle MBR -PassThru'
+                  - 'New-Partition -AssignDriveLetter -UseMaximumSize'
+                  - 'Format-Volume -FileSystem NTFS -NewFileSystemLabel disk2 -Confirm:$true'
+                  - 'New-Item -Path D:\Logs -ItemType Directory'
+                  - 'New-Item -Path D:\userfiles -ItemType Directory'
+
+            c:\cfn\hooks.d\cfn-auto-reloader.conf:
+              content:
+                Fn::Join:
+                - ''
+                - - "[cfn-auto-reloader-hook]\n"
+                  - 'triggers=post.update'
+                  - 'path=Resources.EC2LaunchConfig.Metadata.AWS::CloudFormation::Init'
+                  - 'action=cfn-init.exe -v -s '
+                  - Ref: AWS::StackId
+                  - " -r EC2LaunchConfig"
+                  - " --region "
+                  - Ref: AWS::Region
+                  - "\n"
+          commands:
+            10-Initialize-Format-Volume:
+              command: powershell.exe c:\initialize-disk.ps1
+              ignoreErrors: "true"
+              waitAfterCompletion: '30'
+            11-Pull-awsclient:
+              command: powershell.exe -Command Invoke-WebRequest -Uri https://s3.amazonaws.com/aws-cli/AWSCLI64PY3.msi -Outfile c:\AWSCLI6PY3.msi
+              waitAfterCompletion: '50'
+            12-install-awscli:
+              command: powershell.exe -Command Start-Process C:\AWSCLI6PY3.msi /quiet -wait
+              waitAfterCompletion: '50'
+            14-Sync-Ebs-Data:
+              command: 'C:\"Program Files"\Amazon\AWSCLI\bin\aws.exe s3 sync s3://isen2-dummy-logs/ D:\'
+              ignoreErrors: "true"
+              waitAfterCompletion: "30"
+            16-RebootServer:
+              command: powershell.exe -Command Restart-Computer -Force
+              
+          services:
+            windows:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                - c:\cfn\cfn-hup.conf
+                - c:\cfn\hooks.d\cfn-auto-reloader.conf
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !Ref AMI
+      IamInstanceProfile: !Ref S3FullInstanceProfile
+      SecurityGroups:
+        - !Ref ApplicationEC2SG
+      InstanceType: !Ref EC2InstanceType
+      BlockDeviceMappings: 
+        - DeviceName: /dev/sdh
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 200
+            DeleteOnTermination: false
+            Encrypted: true
+
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "<script>\n"
+            - 'cfn-init.exe -v -s '
+            - Ref: AWS::StackId
+            - " -r EC2LaunchConfig"
+            - " --region "
+            - Ref: AWS::Region
+            - "\n"
+            - "</script>"
+
+  EC2AutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref EC2SubnetA
+        - !Ref EC2SubnetB
+      MinSize: !Ref EC2NodeCount
+      LaunchConfigurationName: !Ref EC2LaunchConfig
+      MaxSize: !Ref EC2NodeCount
+      DesiredCapacity: !Ref EC2NodeCount
+      Tags:
+        - Key: EBSSync-SSM
+          Value: 'true'
+          PropagateAtLaunch: true
+        - Key: EC2-Name
+          Value: !Join 
+            - ''
+            - - !Ref EC2HostName
+          PropagateAtLaunch: true
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref Application
+              - '-'
+              - !Ref Environment
+              - '-instance'
+          PropagateAtLaunch: true
+  
+  S3FullInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref S3FullRole
+  S3FullPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: S3FullPolicy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:*'
+              - 'rds:*'
+            Resource: '*'
+      Roles:
+        - !Ref S3FullRole
+  S3FullRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+        - 'arn:aws:iam::aws:policy/AWSBackupAdminPolicy'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - rds.amazonaws.com
+                - backup.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  ApplicationEC2SG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: EC2 Server Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: !Ref InternalCorporateCidrIp
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: !Ref InternalCorporateCidrIp
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: !Ref InternalCorporateCidrIp

@@ -1,0 +1,383 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AutoResults Application's CICD Pipeline 
+Parameters:
+
+  myVPC:
+    Description: Choose VPC
+    Type: AWS::EC2::VPC::Id
+
+  ChangeSetName:
+    Description: provide name for the change set
+    Default: myapp-changeset
+
+  Application:
+    Description: Enter the application names in lowercase only
+    Type: String
+    Default: myapp
+
+  CloudFormationTemplate:
+    Description: Enter the file name of the cloudformation template in the git repository
+    Type: String
+    Default: mystack.yml
+
+  Environment:
+    Description: Environment for this project
+    Type: String
+    AllowedValues:
+      - 'prod'
+  
+  ParameterStore:
+    Description: Code pipeline to input parameters for the stack
+    Type: String
+    Default: myapp-Parameters
+  
+  GITUSER: 
+    Description: GIT user to clone the repo
+    Type: String
+    Default: 'sudusan'
+
+  GITPASSWORD:
+    Description: GIT pasword to clone the repo
+    Type: String
+    Default: 'Kunjup00'
+    NoEcho: true
+
+  REPOURL:
+    Description: URL for GIT repository
+    Type: String
+    Default: 'https://github.com/sudusan/changeset-repo'
+
+  LambdaSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Lambda App subnets from multiple Az
+  
+
+  Secret:
+    Description: Secret for API gateway to trigger from GIT
+    Type: String
+    NoEcho: true
+
+  S3ObjectKey:
+    Type: String
+    Description: S3 key to monitor
+    Default: files.zip
+
+  SNSEmail:
+    Type: String
+    Description: Email to receive SNS notifications
+    Default: sudhakar.sankaran@autodesk.com
+
+Resources:
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "codebuild.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      Policies:
+        - PolicyName: !Sub '${Application}-code-build-service-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - ssm:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - "iam:PassRole"
+              
+                
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId:
+        Ref: myVPC
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+    
+  LambdaCodeBuild: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaRole"
+          - "Arn"
+      Code:
+        ZipFile: !Sub |
+          import json
+          return json.dumps('Hello from lambda')
+      
+      Runtime: "python3.6"
+      Timeout: 5
+      FunctionName: !Sub '${Application}-ci-cd-stack'
+      Environment:
+        Variables:
+          SECRET: !Ref Secret
+          GIT_USER: !Ref GITUSER
+          GIT_PASSWORD: !Ref GITPASSWORD
+          REPO_URL: !Ref REPOURL
+          CFNAME: !Ref CloudFormationTemplate
+          S3BUCKET: !Ref CodeUploadBucket
+          STACKNAME: !Sub '${Application}-app-cf-stack'
+          PARAMETERSTORE: !Ref ParameterStore
+      VpcConfig:
+        SecurityGroupIds: 
+          - !Ref LambdaSecurityGroup
+        SubnetIds: !Ref LambdaSubnets
+
+    
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: l
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - logs:CreateLogStream
+                  - s3:ListAllMyBuckets
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - s3:HeadBucket
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Sid: VisualEditor28
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub 'arn:aws:s3:::${CodeUploadBucket}'
+                  - !Sub 'arn:aws:s3:::${CodeUploadBucket}/*'
+                  
+                
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "codepipeline.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      Policies:
+        - PolicyName: !Sub '${Application}-Codepipeline-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - iam:PassRole
+                  - sns:Publish
+      
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  CodeUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Application}-ci-cd-codeupload-filebucket'
+      VersioningConfiguration:
+        Status: Enabled
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/python:3.6.5"
+        Type: "LINUX_CONTAINER"
+      Name: !Sub '${Application}-code-build-project'
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  Api:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: !Sub '${Application}-ci-cd-codebuild'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  
+  ApiResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt Api.RootResourceId
+      RestApiId: !Ref Api
+      PathPart: trigger
+  
+  ApiMethod:
+    Type: "AWS::ApiGateway::Method"
+    DependsOn:
+      - ApiResource
+    Properties:
+      AuthorizationType: "NONE"
+      HttpMethod: "POST"
+      Integration:
+        IntegrationHttpMethod: "POST"
+        Type: "AWS_PROXY"
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaCodeBuild.Arn}/invocations'
+      ResourceId: !Ref ApiResource
+      RestApiId: !Ref Api
+
+  lambdaApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    DependsOn:
+      - ApiMethod
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref LambdaCodeBuild
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/POST/trigger"
+  
+  ApiDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn:
+      - "lambdaApiGatewayInvoke"
+    Properties:
+      RestApiId: !Ref Api
+      StageName: !Ref Environment
+  
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint: !Ref SNSEmail
+        Protocol: email
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: GetCodefromSource
+          Actions:
+            - Name: GetS3Sources
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                S3Bucket: !Ref CodeUploadBucket
+                S3ObjectKey: !Ref S3ObjectKey
+                PollForSourceChanges: true
+              RunOrder: 1
+        - Name: CreateChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1' 
+          InputArtifacts:
+            - Name: Source
+          Configuration:
+            ActionMode: CHANGE_SET_REPLACE
+            StackName: !Sub '${Application}-app-cf-stack'
+            ChangeSetName: !Sub '${ChangeSetName}-${Application}'
+            TemplateConfiguration: SourceOutput::IAC/parameters.json
+            TemplatePath: SourceOutput::IAC/mystack.yml 
+          RunOrder: 2
+        - Name: ApproveChangeSet
+          ActionTypeId:
+            Category: Approval
+            Owner: AWS
+            Provider: Manual
+            Version: 1
+          Configuration:
+            NotificationArn: !Ref SNSTopic
+            CustomData: !Sub 'A new change set - ${ChangeSetName}-${Application} - was created for the ${Application}-app-cf-stack stack. Do you want to implement the changes?'
+          RunOrder: 3
+        - Name: CodepipelineApproval
+          Actions:
+            - InputArtifacts: []
+              Name: Approval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: '1'
+                Provider: Manual
+              OutputArtifacts: []
+              Configuration:
+                NotificationArn: !Ref SNSTopic
+                CustomData: Approval or Reject this change with stack build
+              RunOrder: 4
+        - Name: UpdateStack
+          Actions:
+            - Name: UpdateCloudFormation
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: Source
+              RunOrder: 3
+Outputs:
+  PipelineUrl:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}

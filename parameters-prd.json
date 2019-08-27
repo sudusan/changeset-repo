@@ -2,7 +2,7 @@
     "Application": "myapp",
     "ChangeSetName": "myapp-changeset",
     "Account": "247527692239",
-    "Environment": "prd",
+    "Environment": "PRD",
     "VpcId": "vpc-f4c12d9f",
     "SNSEndpoint": "sudhakar.sankaran@autodesk.com",
     "EC2SubnetA": "subnet-a9cdd9c1",

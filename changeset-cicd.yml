@@ -53,9 +53,11 @@ Parameters:
  SlackChannel:
     Description: Slack Channel where approvals needs to be sent
     Type: String
+    Default: des_autoresults_cicd
  SlackVerifToken:
     Description: slack verification token of the app, store and encrypt in parameter store, It should be of form {{resolve:ssm-secure:<key-name>:<version>}}'
     Type: String
+    Default: pZyo0T8Vksqbvxi7uQeJukHS
  SlackApprovalMembers:
     Description: List of AD account of the member who can perform the slack approval for CICD.
     Type: String

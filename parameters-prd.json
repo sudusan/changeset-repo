@@ -1,16 +1,16 @@
 {
     "Application": "myapp",
     "ChangeSetName": "myapp-changeset",
-    "Account": "247527692239",
+    "Account": "549676813210",
     "Environment": "PRD",
-    "VpcId": "vpc-f4c12d9f",
+    "VpcId": "vpc-04f6f36a925bf11f1",
     "SNSEndpoint": "sudhakar.sankaran@autodesk.com",
-    "EC2SubnetA": "subnet-a9cdd9c1",
-    "EC2SubnetB": "subnet-6ece8c14",
-    "EC2InstanceType": "m5a.xlarge",
+    "EC2SubnetA": "subnet-04bd0fb43eab55d57",
+    "EC2SubnetB": "subnet-0a1ba8dfd4542379a",
+    "EC2InstanceType": "t2.micro",
     "EC2HostName": "myapphost",
     "EC2NodeCount": "1",
-    "AMI": "ami-0a6b96ce710e139e3",
-    "KeyName": "isen2-ohio",
+    "AMI": "ami-0a92c908f6b2e07a0",
+    "KeyName": "cms-oregon-kp",
     "InternalCorporateCidrIp": "0.0.0.0/0"
 }

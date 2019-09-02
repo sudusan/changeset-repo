@@ -7,9 +7,7 @@ Parameters:
     Description: Please enter your Application Name
   Environment:
     Type: String
-    Default: stg
-    AllowedValues:
-      - prd
+    Default: STG
     Description: Please enter your environment name
   VpcId:
     Type: 'AWS::EC2::VPC::Id'
@@ -210,14 +208,14 @@ Resources:
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '3389'
-          ToPort: '3389'
+          FromPort: 3389
+          ToPort: 3389
           CidrIp: !Ref InternalCorporateCidrIp
         - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
+          FromPort: 80
+          ToPort: 80
           CidrIp: !Ref InternalCorporateCidrIp
         - IpProtocol: tcp
-          FromPort: '443'
-          ToPort: '443'
+          FromPort: 443
+          ToPort: 443
           CidrIp: !Ref InternalCorporateCidrIp

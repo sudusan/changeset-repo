@@ -8,7 +8,7 @@ Parameters:
   Description: 'Select the bucket based on the region'
   Type: String
   AllowedValues:
-      - 'isen-cirrus-cicd-prd-east'
+      - 'cirrus-cicd-prd-west'
  SourceObjectKey:
   Description: 'S3 source artifact'
   Type: String
@@ -38,7 +38,7 @@ Parameters:
  StageAccountId:
   Description: The AWS Account ID of the Stage account. Leave as default if EnvironmentClass is not "PROD"
   Type: String
-  Default: 805262168568
+  Default: 002716706462
  StageLambdaRole:
   Description: The AWS IAM Role of the Stage account's Lambda execution role. Leave as default if EnvironmentClass is not "PROD"
   Type: String
@@ -61,13 +61,13 @@ Parameters:
  SlackApprovalMembers:
     Description: List of AD account of the member who can perform the slack approval for CICD.
     Type: String
-    Default: narayas,sekarbg,johna,ahmedsha,kamblia,vadlaps,sharee,narayac,siddiqa,kharbaa,kishorn,sinhama    
+    Default: sanksu   
  NotificationsSNSTopic:
     Description: ARN of the SNS topic that will be used for notifications on the pipeline (if not specified a new one will be created).
     Type: String
     Default: ''
  AllowedIps:
-    Default: 132.188.0.0/16
+    Default: 0.0.0.0/0
     Description: gitpull method only. Comma seperated list of IP CIDR blocks for source
       IP authentication. The Autodesk external IP range is provided as default.
     Type: String   
@@ -730,6 +730,7 @@ Resources:
 
   PipelineSNSTopicPolicy:
     Type: AWS::SNS::TopicPolicy
+    Condition: NotSTGEnvironment
     Properties:
       PolicyDocument:
         Id: MyTopicPolicy
@@ -948,7 +949,7 @@ Resources:
           version: "1.0"
           title: "CICD"
           contact:
-            email: "sai.chaitanya@autodesk.com"
+            email: "sudhakar.sankaran@autodesk.com"
           license:
             name: "Apache 2.0"
             url: "http://www.apache.org/licenses/LICENSE-2.0.html"

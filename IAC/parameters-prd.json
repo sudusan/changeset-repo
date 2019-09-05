@@ -8,7 +8,7 @@
         "EC2InstanceType": "t2.micro",
         "EC2HostName": "myapphost",
         "EC2NodeCount": "1",
-        "AMI": "ami-0a92c908f6b2e07a0",
+        "AMI": "ami-06a0d33fc8d328de0",
         "KeyName": "cms-oregon-kp",
         "InternalCorporateCidrIp": "0.0.0.0/0"
     }

@@ -17,10 +17,19 @@ Parameters:
   Description: 'Name of the bucket which houses nested cloudformation templates'
   Type: String
   Default: myapp-cicd-nestedstack 
+ ChangeSetName:
+  Description: 'Name of application'
+  Type: String
+  Default: myapp-changeset
  ApplicationName:
   Description: 'Name of application'
   Type: String
   Default: myapp
+ SNSEmail:
+  Description: 'approver email id'
+  Type: String
+  Default: 'sudhakar.sankaran@autodesk.com'
+
  EnvironmentClass:
   Description: 'Environment being deployed into'
   Type: String
@@ -691,6 +700,14 @@ Resources:
       Subscription:
         - Endpoint: !GetAtt 'ApprovalRequesterFunction.Arn'
           Protocol: lambda
+  
+  ChangeSetApprovalSNSTopic:
+    Type: AWS::SNS::Topic
+    Condition: NotSTGEnvironment
+    Properties:
+      Subscription:
+      - Endpoint: !Ref SNSEmail
+        Protocol: email
 
   pipelinesevent:
     DependsOn: Codepipelinestatusfunction
@@ -1298,27 +1315,51 @@ Resources:
               - CreateNewSNSTopic
               - !Ref CodePipelineSNSTopic
               - !Ref NotificationsSNSTopic
-          RunOrder: 3                    
+          RunOrder: 3
       -
-        Name: Deploy
+        Name: ChangeSet
         Actions:
         -
-          Name: CloudFormation
-          InputArtifacts:
-            - Name: SourceOutput  
+          Name: CreateChangeSet
           ActionTypeId:
             Category: Deploy
             Owner: AWS
-            Version: "1"
             Provider: CloudFormation
+            Version: '1'
+          InputArtifacts:
+            - Name: SourceOutput
           Configuration:
             StackName: !Join [ '-', [ !Ref ApplicationName, !Ref EnvironmentClass, 'Stack' ] ]
-            ActionMode: CREATE_UPDATE
+            ActionMode: CHANGE_SET_REPLACE
             Capabilities: CAPABILITY_NAMED_IAM
             RoleArn: !GetAtt CodePipelineServiceRole.Arn
+            ChangeSetName: !Ref ChangeSetName
             TemplateConfiguration: SourceOutput::IAC/parameters-prd.json
             TemplatePath: SourceOutput::IAC/application-stack.yml
           RunOrder: 4
+        - Name: ApproveChangeSet
+          ActionTypeId:
+            Category: Approval
+            Owner: AWS
+            Provider: Manual
+            Version: '1'
+          Configuration:
+            NotificationArn: !Ref ChangeSetApprovalSNSTopic
+            CustomData: !Sub 'A new change set was created for the ${AWS::StackName} stack. Do you want to implement the changes?'
+          RunOrder: '5'
+        - Name: ExecuteChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1'
+          Configuration:
+            ActionMode: CHANGE_SET_EXECUTE
+            ChangeSetName: !Ref ChangeSetName
+            RoleArn: !GetAtt CodePipelineServiceRole.Arn
+            StackName: !Join [ '-', [ !Ref ApplicationName, !Ref EnvironmentClass, 'Stack' ] ]
+          RunOrder: '6'
+
       -
         Name: Test
         Actions:
@@ -1396,7 +1437,7 @@ Resources:
             RoleArn: !GetAtt CodePipelineServiceRole.Arn
             TemplateConfiguration: SourceOutput::IAC/parameters-stg.json
             TemplatePath: SourceOutput::IAC/application-stack.yml
-          RunOrder: 4
+          RunOrder: 3
       -
         Name: Test
         Actions:
@@ -1411,7 +1452,7 @@ Resources:
             Provider: CodeBuild
           Configuration:
             ProjectName: !Ref CodeBuildPostDeployTest
-          RunOrder: 7
+          RunOrder: 4
       -
         Name: TriggerProdDeployment
         Actions:

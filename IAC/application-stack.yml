@@ -216,6 +216,10 @@ Resources:
           ToPort: 80
           CidrIp: !Ref InternalCorporateCidrIp
         - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref InternalCorporateCidrIp
+        - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           CidrIp: !Ref InternalCorporateCidrIp

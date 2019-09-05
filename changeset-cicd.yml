@@ -1391,7 +1391,7 @@ Resources:
             ActionMode: CREATE_UPDATE
             Capabilities: CAPABILITY_NAMED_IAM
             RoleArn: !GetAtt CodePipelineServiceRole.Arn
-            TemplateConfiguration: SourceOutput::IAC/parameters-dev.json
+            TemplateConfiguration: SourceOutput::IAC/parameters-stg.json
             TemplatePath: SourceOutput::IAC/application-stack.yml
           RunOrder: 4
       -

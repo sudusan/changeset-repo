@@ -1211,6 +1211,9 @@ Resources:
             - iam:PassRole
             - iam:CreateServiceLinkedRole
             - iam:CreateRole
+            - iam:GetRolePolicy
+            - iam:PutRolePolicy
+            - iam:DeleteRolePolicy
             - iam:AttachRolePolicy
             - iam:DetachRolePolicy
             - iam:DeleteRole

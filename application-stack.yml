@@ -7,9 +7,7 @@ Parameters:
     Description: Please enter your Application Name
   Environment:
     Type: String
-    Default: prd
-    AllowedValues:
-      - prd
+    Default: STG
     Description: Please enter your environment name
   VpcId:
     Type: 'AWS::EC2::VPC::Id'
@@ -98,16 +96,6 @@ Resources:
               command: powershell.exe c:\initialize-disk.ps1
               ignoreErrors: "true"
               waitAfterCompletion: '30'
-            11-Pull-awsclient:
-              command: powershell.exe -Command Invoke-WebRequest -Uri https://s3.amazonaws.com/aws-cli/AWSCLI64PY3.msi -Outfile c:\AWSCLI6PY3.msi
-              waitAfterCompletion: '50'
-            12-install-awscli:
-              command: powershell.exe -Command Start-Process C:\AWSCLI6PY3.msi /quiet -wait
-              waitAfterCompletion: '50'
-            14-Sync-Ebs-Data:
-              command: 'C:\"Program Files"\Amazon\AWSCLI\bin\aws.exe s3 sync s3://isen2-dummy-logs/ D:\'
-              ignoreErrors: "true"
-              waitAfterCompletion: "30"
             16-RebootServer:
               command: powershell.exe -Command Restart-Computer -Force
               
@@ -220,14 +208,14 @@ Resources:
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '3389'
-          ToPort: '3389'
+          FromPort: 3389
+          ToPort: 3389
           CidrIp: !Ref InternalCorporateCidrIp
         - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
+          FromPort: 80
+          ToPort: 80
           CidrIp: !Ref InternalCorporateCidrIp
         - IpProtocol: tcp
-          FromPort: '443'
-          ToPort: '443'
+          FromPort: 443
+          ToPort: 443
           CidrIp: !Ref InternalCorporateCidrIp

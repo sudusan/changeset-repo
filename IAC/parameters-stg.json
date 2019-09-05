@@ -1,11 +1,8 @@
 {
     "Parameters": {
         "Application": "myapp",
-        "ChangeSetName": "myapp-changeset",
-        "Account": "002716706462",
         "Environment": "STG",
         "VpcId": "vpc-0519dc920c7026174",
-        "SNSEndpoint": "sudhakar.sankaran@autodesk.com",
         "EC2SubnetA": "subnet-0082e8e60aacffaf5",
         "EC2SubnetB": "subnet-0a9e17be582b50e92",
         "EC2InstanceType": "t2.micro",

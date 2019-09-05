@@ -5,6 +5,18 @@ Parameters:
     Type: String
     Default: myapp
     Description: Please enter your Application Name
+  ChangeSetName:
+    Type: String
+    Default: myapp-changeset
+    Description: Please enter your changeset Name
+  Account:
+    Type: String
+    Default: 002716706462
+    Description: Please enter your account id
+  SNSEndpoint:
+    Type: String
+    Default: myapp-sns
+    Description: Please enter your sns endpoint Name
   Environment:
     Type: String
     Default: STG

@@ -5,18 +5,6 @@ Parameters:
     Type: String
     Default: myapp
     Description: Please enter your Application Name
-  ChangeSetName:
-    Type: String
-    Default: myapp-changeset
-    Description: Please enter your changeset Name
-  Account:
-    Type: String
-    Default: 002716706462
-    Description: Please enter your account id
-  SNSEndpoint:
-    Type: String
-    Default: myapp-sns
-    Description: Please enter your sns endpoint Name
   Environment:
     Type: String
     Default: STG
@@ -49,7 +37,7 @@ Parameters:
   AMI:
     Description: AMI ID of the image
     Type: 'AWS::EC2::Image::Id'
-    Default: ami-0a6b96ce710e139e3
+    Default: ami-06a0d33fc8d328de0
   KeyName:
     Description: The EC2 Key Pair to allow RDP access to the instances
     Type: 'AWS::EC2::KeyPair::KeyName'

@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A Template to define Venafi ec2 deployment in AWS.
+  - Not intended for multi-region deployments. 
+
+Parameters: 
+  ApplicationName:
+    Type: String
+    Default: nested-stack
+  EnvironmentClass:
+    Type: String
+    Default: DEV
+  AMIIdentifier:
+    Type: AWS::EC2::Image::Id
+  EC2InstanceType: 
+    Type: String
+  EC2KeyName: 
+    Type: String
+    Default: isen2-east1-kp
+  EC2VPCSubNetIds:
+    Type: CommaDelimitedList
+  ALBVPCSubNetIds:
+    Type: CommaDelimitedList
+  VPCId: 
+    Type: String
+    Default: vpc-ed780097
+  InternetAccessible:
+    Type: String
+    Default: internal
+    AllowedValues: 
+      - internet-facing
+      - internal
+  HTTPSCertificateARN:
+    Type: String
+Resources: 
+
+  EC2AZ1:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: us-east-1a #Hardcoded based on Default Values supplied.
+      EbsOptimized: true
+      #IamInstanceProfile: String #This will be important to identify in the future.
+      ImageId: !Ref AMIIdentifier
+      InstanceInitiatedShutdownBehavior: 'stop'
+      InstanceType: !Ref EC2InstanceType
+      KeyName: !Ref EC2KeyName
+      Monitoring: true
+      #PrivateIpAddress: String #If a specific IP Address is desired.
+      SecurityGroupIds:
+        - !GetAtt EC2FleetSecurityGroup.GroupId
+      SourceDestCheck: true
+      SubnetId: !Select [ 0 , !Ref EC2VPCSubNetIds ]
+      Tags:
+        - Key: ApplicationName
+          Value: !Ref ApplicationName
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass
+      #UserData: String #Perhaps the app startup commands.
+
+  EC2AZ2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: us-east-1b #Hardcoded based on Default Values supplied.
+      EbsOptimized: true
+      #IamInstanceProfile: String #This will be important to identify in the future.
+      ImageId: !Ref AMIIdentifier
+      InstanceInitiatedShutdownBehavior: 'stop'
+      InstanceType: !Ref EC2InstanceType
+      KeyName: !Ref EC2KeyName
+      Monitoring: true
+      #PrivateIpAddress: String #If a specific IP Address is desired.
+      SecurityGroupIds:
+        - !GetAtt EC2FleetSecurityGroup.GroupId
+      SourceDestCheck: true
+      SubnetId: !Select [ 1 ,!Ref EC2VPCSubNetIds ]
+      Tags:
+        - Key: ApplicationName
+          Value: !Ref ApplicationName
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass
+      #UserData: String #Perhaps the app startup commands
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      SecurityGroups: 
+        - !GetAtt ALBSecurityGroup.GroupId
+      Subnets: !Ref ALBVPCSubNetIds
+      Scheme: !Ref InternetAccessible
+      Tags:
+        - Key: ApplicationName
+          Value: !Ref ApplicationName
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass
+    
+  ALBHTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig: 
+            Port: '443'
+            Protocol: HTTPS
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+
+  ALBHTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      Certificates: #Needs to be provided to Amazon Certificate Manager
+       - CertificateArn: !Ref HTTPSCertificateARN
+      DefaultActions:
+        - TargetGroupArn: !Ref ALBHTTPSTargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+
+  ALBHTTPSTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      Port: 443
+      Protocol: HTTPS
+      VpcId: !Ref VPCId
+      Targets:
+        - Id: !Ref EC2AZ1
+        - Id: !Ref EC2AZ2
+      HealthCheckEnabled: true
+      HealthCheckPath: /vedadmin
+      HealthCheckProtocol: HTTPS
+      Matcher:
+        HttpCode: 200,301
+      Tags:
+      - Key: EnvironmentClass
+        Value: !Ref EnvironmentClass
+      - Key: ApplicationName
+        Value: !Ref ApplicationName  
+
+
+# This is a template to use in future state, however the application is currently not capable of being launched or maintained using an autoscaling group. 
+#  ComputeFleet: 
+#      Type: AWS::AutoScaling::AutoScalingGroup
+#      Properties:
+#        Cooldown: 300
+#        DesiredCapacity: !Ref DesiredComputeCapacity
+#        LaunchConfigurationName: !Ref ComputeLaunchConfig
+#        MaxSize: !Ref EC2MaxSize
+#        MinSize: !Ref EC2MinSize
+#        MetricsCollection: 
+#          - Granularity: 1Minute 
+#        TargetGroupARNs: 
+#          - !Ref ALBHTTPTargetGroup       
+#          #- !Ref ALBHTTPSTargetGroup
+#        VPCZoneIdentifier: !Ref EC2VPCSubNetIds
+#        Tags: 
+#          - Key: EnvironmentClass
+#            Value: !Ref EnvironmentClass
+#            PropagateAtLaunch: 'true'
+  #ComputeLaunchConfig: #To be used with Autoscaling
+  #  Type: AWS::AutoScaling::LaunchConfiguration
+  #  Properties:
+  #    ImageId: !Ref AMIIdentifier
+  #    InstanceType: !Ref EC2InstanceType
+  #    KeyName: !Ref EC2KeyName
+  #    SecurityGroups: 
+  #      - !GetAtt EC2FleetSecurityGroup.GroupId
+
+  EC2FleetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allow access to EC2 from Load Balancers"
+      SecurityGroupEgress:
+      - IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+        CidrIp: "0.0.0.0/0"
+      - IpProtocol: "tcp"
+        FromPort: 443
+        ToPort: 443
+        CidrIp: "0.0.0.0/0"
+      - IpProtocol: "tcp"
+        FromPort: 1433
+        ToPort: 1433
+        CidrIp: "0.0.0.0/0"
+      SecurityGroupIngress: #Lacks Access utilizing RDP/SSH/Direct IP
+      - IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+        SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+      - IpProtocol: "tcp"
+        FromPort: 443
+        ToPort: 443
+        SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+      - IpProtocol: "tcp"
+        FromPort: 3389
+        ToPort: 3389
+        CidrIp: "10.0.0.0/8"    
+      Tags:
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass
+        - Key: ApplicationName
+          Value: !Ref ApplicationName  
+      VpcId: !Ref VPCId
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allow access from the world to Load Balancers"
+      SecurityGroupEgress:
+      - IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+        CidrIp: "0.0.0.0/0"
+      - IpProtocol: "tcp"
+        FromPort: 443
+        ToPort: 443
+        CidrIp: "0.0.0.0/0"
+      SecurityGroupIngress:
+      - IpProtocol: "tcp"
+        FromPort: 443
+        ToPort: 443
+        CidrIp: "10.0.0.0/8"
+      - IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+        CidrIp: "10.0.0.0/8"
+      Tags:
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass 
+        - Key: ApplicationName
+          Value: !Ref ApplicationName       
+      VpcId: !Ref VPCId
+
+Outputs:
+  EC2SecurityGroup: 
+    Description: Security Group of the main compute processing fleet. 
+    Value: !GetAtt EC2FleetSecurityGroup.GroupId

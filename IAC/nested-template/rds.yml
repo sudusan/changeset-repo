@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A Template to define RDS Multi-AZ deployments. 
+  - Not intended for multi-region deployments. 
+
+Parameters: 
+  ApplicationName:
+    Type: String
+  EnvironmentClass:
+    Type: String
+    AllowedValues:
+    - PRD
+    - STG
+    - QA
+    - DEV
+  EC2FleetSecurityGroup: 
+    Type: String
+  VPCId: 
+    Type: String
+    Default: vpc-016a8d100352913db
+  DBSubNetIds:
+    Type: CommaDelimitedList
+  DBInstanceType: 
+    Type: String
+    Default: db.m5.large
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: badministrator
+
+
+Resources: 
+  DbSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds:
+        - !Select [ 0 , !Ref DBSubNetIds ]
+        - !Select [ 1 , !Ref DBSubNetIds ]
+  SQLServerInstance:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      AllocatedStorage: '200' #Current Prod DB is 30G, this is the minimum for SQL Server.
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 8
+      CopyTagsToSnapshot: true
+      DBInstanceClass: !Ref DBInstanceType
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DeletionProtection: false #FIXME once ready to commit. 
+      Engine: sqlserver-se
+      LicenseModel:  license-included
+      #EngineVersion: String # Latest at time of authoring is 14.00.3049.1
+      MasterUserPassword: !Ref DBPassword
+      MasterUsername: administrator #Can be configured for Venafi app requirements.
+      MultiAZ: true
+      #OptionGroupName: String #Include if SQL Server needs specific 
+      Port: '1433'
+      PreferredBackupWindow: 08:00-10:00 # 1:00 AM - 3:00 AM PST
+      PreferredMaintenanceWindow: Sun:10:01-Sun:12:00 # 3:01 AM PST - 5:00 AM PST Sunday
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      StorageType: 'gp2'
+      Tags:
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass    
+        - Key: ApplicationName
+          Value: !Ref ApplicationName  
+      UseDefaultProcessorFeatures: true
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+    DependsOn: DatabaseSecurityGroup
+  
+  #DatabaseSubnetGroup: #Cannot be created due to IAM permissioning on my role. 
+  #  Type: "AWS::RDS::DBSubnetGroup"
+  #  Properties:
+  #    DBSubnetGroupDescription: Subnet for Venafi RDS Instance #required
+  #    SubnetIds: !Split [ ',' , !Ref Subnets]
+  #    Tags:
+  #      - Key: EnvironmentClass
+  #        Value: !Ref EnvironmentClass    
+  #      - Key: ApplicationName
+  #        Value: !Ref ApplicationName  
+    
+
+  DatabaseSecurityGroup: 
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allow access to RDS for Compute fleet"
+      SecurityGroupEgress:
+      - IpProtocol: "tcp"
+        FromPort: 1433
+        ToPort: 1433
+        CidrIp: "0.0.0.0/0"
+      SecurityGroupIngress:
+      - IpProtocol: "tcp"
+        FromPort: 1433
+        ToPort: 1433
+        SourceSecurityGroupId: !Ref EC2FleetSecurityGroup
+      Tags:
+        - Key: EnvironmentClass
+          Value: !Ref EnvironmentClass    
+        - Key: ApplicationName
+          Value: !Ref ApplicationName  
+      VpcId: !Ref VPCId 
+
+Outputs:
+  RDSWriterEndpoint:
+    Description: The endpoint for the application to do read/write connections
+    Value: !GetAtt SQLServerInstance.Endpoint.Address
+  RDSEndpointPort:
+    Description: The port endpoint for the application to do database connections
+    Value: !GetAtt SQLServerInstance.Endpoint.Port

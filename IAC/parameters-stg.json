@@ -1,15 +1,19 @@
 {
     "Parameters": {
-        "Application": "myapp",
-        "Environment": "STG",
-        "VpcId": "vpc-0519dc920c7026174",
-        "EC2SubnetA": "subnet-0082e8e60aacffaf5",
-        "EC2SubnetB": "subnet-0a9e17be582b50e92",
+        "ApplicationName": "myapp",
+        "EnvironmentClass": "STG",
+        "VpcId": "vpc-3749cd4f",
+        "EC2VPCSubNetIds": "subnet-037d9fc531d3afc67,subnet-05650d81793608de3",
+        "ALBVPCSubNetIds": "subnet-996e7fe0,subnet-6587b42e",
+        "DBSubNetIds": "subnet-08a0e97502a8c0c23,subnet-026b2aa3855ca52f6",
         "EC2InstanceType": "t2.micro",
         "EC2HostName": "myapphost",
         "EC2NodeCount": "1",
-        "AMI": "ami-06a0d33fc8d328de0",
-        "KeyName": "digitalsigning-oregon-kp",
-        "InternalCorporateCidrIp": "0.0.0.0/0"
+        "AMIIdentifier": "ami-0b69ea66ff7391e80",
+        "EC2KeyName": "isen3-oregon-kp",
+        "InternetAccessible": "internet-facing",
+        "HTTPSCertificateARN": "arn:aws:acm:us-west-2:200365596947:certificate/924fa51c-df37-46f8-a5cd-97f74447efcd",
+        "InternalCorporateCidrIp": "0.0.0.0/0",
+        "DBInstanceType": "db.m5.large",
     }
 }

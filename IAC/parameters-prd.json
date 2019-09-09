@@ -1,15 +1,19 @@
 {
     "Parameters": {
-        "Application": "myapp",
-        "Environment": "PRD",
-        "VpcId": "vpc-04f6f36a925bf11f1",
-        "EC2SubnetA": "subnet-04bd0fb43eab55d57",
-        "EC2SubnetB": "subnet-0a1ba8dfd4542379a",
+        "ApplicationName": "myapp",
+        "EnvironmentClass": "PRD",
+        "VpcId": "vpc-e6af299e",
+        "EC2VPCSubNetIds": "subnet-05714b1801c840b2e,subnet-0541d4031da0dc8d0",
+        "ALBVPCSubNetIds": "subnet-38b28f73,subnet-d14c5fa8",
+        "DBSubNetIds": "subnet-089dcdcba06dec93d,subnet-06b8a4e0b1e9d4dce",
         "EC2InstanceType": "t2.micro",
         "EC2HostName": "myapphost",
         "EC2NodeCount": "1",
-        "AMI": "ami-06a0d33fc8d328de0",
-        "KeyName": "cms-oregon-kp",
-        "InternalCorporateCidrIp": "0.0.0.0/0"
+        "AMIIdentifier": "ami-0b69ea66ff7391e80",
+        "EC2KeyName": "isen2-oregon-kp",
+        "InternetAccessible": "internet-facing",
+        "HTTPSCertificateARN": "arn:aws:acm:us-west-2:247527692239:certificate/47591a85-dc6f-47e1-adf2-6609e4aed4bf",
+        "InternalCorporateCidrIp": "0.0.0.0/0",
+        "DBInstanceType": "db.m5.large"
     }
 }

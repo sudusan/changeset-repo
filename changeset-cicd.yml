@@ -8,7 +8,7 @@ Parameters:
   Description: 'Select the bucket based on the region'
   Type: String
   AllowedValues:
-      - 'cirrus-cicd-prd-west'
+      - 'lambda-cicd-west-2'
  SourceObjectKey:
   Description: 'S3 source artifact'
   Type: String
@@ -47,7 +47,7 @@ Parameters:
  StageAccountId:
   Description: The AWS Account ID of the Stage account. Leave as default if EnvironmentClass is not "PROD"
   Type: String
-  Default: 002716706462
+  Default: 200365596947
  StageLambdaRole:
   Description: The AWS IAM Role of the Stage account's Lambda execution role. Leave as default if EnvironmentClass is not "PROD"
   Type: String

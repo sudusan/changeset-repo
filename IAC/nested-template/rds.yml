@@ -16,7 +16,7 @@ Parameters:
     Type: String
   VPCId: 
     Type: String
-    Default: vpc-016a8d100352913db
+
   DBSubNetIds:
     Type: CommaDelimitedList
   DBInstanceType: 

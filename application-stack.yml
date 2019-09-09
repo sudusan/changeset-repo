@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: AutoResults Application's Production Environment's CF Template
+Description: Changeset Application's Production Environment's CF Template
 Parameters:
   Application:
     Type: String
